@@ -4,6 +4,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import time
 import pandas as pd
+import streamlit as st
 
 import configparser
 
@@ -66,7 +67,12 @@ def compare_artists(event_url):
     
     return df  # Return DataFrame instead of printing
      
-# ---- RUN SCRIPT ----
-df = compare_artists(event_url)
-# Sort by Liked Songs in descending order
-df = df.sort_values(by="Liked Songs", ascending=False)
+# Streamlit App
+st.title("FestiBesti: Spotify Liked Songs Comparison")
+
+event_url = st.text_input("Enter Insomniac Event URL", "https://socal.beyondwonderland.com/lineup/")
+
+if st.button("Get Lineup & Liked Songs"):
+    df = compare_artists(event_url)
+    df = df.sort_values(by="Liked Songs", ascending=False)
+    st.dataframe(df)  # Displays as an interactive table
