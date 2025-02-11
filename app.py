@@ -8,9 +8,24 @@ import streamlit as st
 
 import configparser
 
-# Load config file
-config = configparser.ConfigParser()
-config.read("config.ini")
+import streamlit as st
+
+try:
+    api_key = st.secrets["my_secrets"]["api_key"]
+    spotify_client_id = st.secrets["my_secrets"]["spotify_client_id"]
+    spotify_client_secret = st.secrets["my_secrets"]["redirect_uri"]
+    st.write("API key found:", api_key)
+except KeyError:
+    st.write("API key not found. Reading config file.")
+    # Load config file
+    config = configparser.ConfigParser()
+    config.read("config.ini")
+     
+    # ---- STEP 2: SPOTIFY AUTH ----
+    SPOTIPY_CLIENT_ID = config.get("spotify", "client_id")
+    SPOTIPY_CLIENT_SECRET = config.get("spotify", "client_secret")
+    SPOTIPY_REDIRECT_URI = config.get("spotify", "redirect_uri")
+
 
 event_url = 'https://socal.beyondwonderland.com/lineup/'
 
@@ -24,10 +39,7 @@ def get_event_lineup(event_url):
     
     return artists
 
-# ---- STEP 2: SPOTIFY AUTH ----
-SPOTIPY_CLIENT_ID = config.get("spotify", "client_id")
-SPOTIPY_CLIENT_SECRET = config.get("spotify", "client_secret")
-SPOTIPY_REDIRECT_URI = config.get("spotify", "redirect_uri")
+
 
 sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
     client_id=SPOTIPY_CLIENT_ID,
