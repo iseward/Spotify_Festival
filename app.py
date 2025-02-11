@@ -30,8 +30,11 @@ event_url = 'https://socal.beyondwonderland.com/lineup/'
 
 # ---- STEP 1: SCRAPE ARTISTS FROM INSOMNIAC ----
 def get_event_lineup(event_url):
+    print('Before requesting URL')
     response = requests.get(event_url)
+    print('after requesting url')
     soup = BeautifulSoup(response.text, 'html.parser')
+    print('after soup')
     
     # Find artist names (Modify this selector based on Insomniac's HTML structure)
     artists = [artist.text.strip() for artist in soup.select('ul.lineup__list li')]
@@ -68,11 +71,6 @@ def compare_artists(event_url):
     
     data = [{"Artist": artist, "Liked Songs": liked_songs.get(artist, 0)} for artist in lineup]
     
-    #for artist in lineup:
-    #    liked_count = liked_songs.get(artist, 0)
-    #    # Create a list of dictionaries
-    #     print(f"{artist}: {liked_count} liked song(s)")
-    
     # Convert to DataFrame
     df = pd.DataFrame(data)
     
@@ -85,5 +83,6 @@ event_url = st.text_input("Enter Insomniac Event URL", "https://socal.beyondwond
 
 if st.button("Get Lineup & Liked Songs"):
     df = compare_artists(event_url)
+    print('returned df')
     df = df.sort_values(by="Liked Songs", ascending=False)
     st.dataframe(df)  # Displays as an interactive table
