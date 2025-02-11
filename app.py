@@ -11,20 +11,19 @@ import configparser
 import streamlit as st
 
 try:
-    SPOTIPY_CLIENT_ID = st.secrets["my_secrets"]["api_key"]
-    SPOTIPY_CLIENT_SECRET = st.secrets["my_secrets"]["spotify_client_id"]
+    SPOTIPY_CLIENT_ID = st.secrets["my_secrets"]["client_id"]
+    SPOTIPY_CLIENT_SECRET = st.secrets["my_secrets"]["client_secret"]
     SPOTIPY_REDIRECT_URI = st.secrets["my_secrets"]["redirect_uri"]
-    st.write("API key found:", api_key)
+    st.write("API key found:", SPOTIPY_CLIENT_ID)
 except KeyError:
     st.write("API key not found. Reading config file.")
     # Load config file
-    config = configparser.ConfigParser()
-    config.read("config.ini")
-     
+    #config = configparser.ConfigParser()
+    #config.read("config.ini")
     # ---- STEP 2: SPOTIFY AUTH ----
-    SPOTIPY_CLIENT_ID = config.get("spotify", "client_id")
-    SPOTIPY_CLIENT_SECRET = config.get("spotify", "client_secret")
-    SPOTIPY_REDIRECT_URI = config.get("spotify", "redirect_uri")
+    #SPOTIPY_CLIENT_ID = config.get("spotify", "client_id")
+    #SPOTIPY_CLIENT_SECRET = config.get("spotify", "client_secret")
+    #SPOTIPY_REDIRECT_URI = config.get("spotify", "redirect_uri")
 
 
 event_url = 'https://socal.beyondwonderland.com/lineup/'
