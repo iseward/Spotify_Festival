@@ -38,7 +38,7 @@ def get_event_lineup(event_url):
     
     # Find artist names (Modify this selector based on Insomniac's HTML structure)
     artists = [artist.text.strip() for artist in soup.select('ul.lineup__list li')]
-    
+    st.write('returning artists')
     return artists
 
 
@@ -54,10 +54,11 @@ sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
 def get_liked_songs():
     liked_songs = {}
     results = sp.current_user_saved_tracks(limit=50)
-    
+    st.write('Spotify results returned.')
     while results:
         for item in results['items']:
             artist_name = item['track']['artists'][0]['name']
+            st.write('checking artist:', artist_name)
             liked_songs[artist_name] = liked_songs.get(artist_name, 0) + 1
         
         results = sp.next(results) if results['next'] else None
@@ -67,6 +68,7 @@ def get_liked_songs():
 # ---- STEP 4: COMPARE EVENT ARTISTS WITH LIKED SONGS ----
 def compare_artists(event_url):
     lineup = get_event_lineup(event_url)
+    st.write('Getting liked songs')
     liked_songs = get_liked_songs()
     
     data = [{"Artist": artist, "Liked Songs": liked_songs.get(artist, 0)} for artist in lineup]
