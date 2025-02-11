@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
+from spotipy.exceptions import SpotifyException
 import time
 import pandas as pd
 import streamlit as st
@@ -77,13 +78,27 @@ def compare_artists(event_url):
     df = pd.DataFrame(data)
     
     return df  # Return DataFrame instead of printing
+
+def check_authentication():
+    try:
+        user_info = sp.current_user()  # This will fetch the current user's information
+        st.write("Authenticated as:", user_info["display_name"])
+        return True
+    except SpotifyException as e:
+        st.error(f"Authentication failed: {e}")
+        return False
+
+
      
 # Streamlit App
 st.title("FestiBesti: Spotify Liked Songs Comparison")
 
 event_url = st.text_input("Enter Insomniac Event URL", "https://socal.beyondwonderland.com/lineup/")
 
+
+
 if st.button("Get Lineup & Liked Songs"):
+    check_authentication()
     df = compare_artists(event_url)
     st.write('returned df')
     df = df.sort_values(by="Liked Songs", ascending=False)
