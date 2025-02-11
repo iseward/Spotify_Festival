@@ -14,7 +14,7 @@ try:
     SPOTIPY_CLIENT_ID = st.secrets["my_secrets"]["client_id"]
     SPOTIPY_CLIENT_SECRET = st.secrets["my_secrets"]["client_secret"]
     SPOTIPY_REDIRECT_URI = st.secrets["my_secrets"]["redirect_uri"]
-    st.write("API key found:", SPOTIPY_CLIENT_ID)
+    #st.write("API key found:", SPOTIPY_CLIENT_ID)
 except KeyError:
     st.write("API key not found. Reading config file.")
     # Load config file
