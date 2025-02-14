@@ -60,7 +60,7 @@ if "code" in query_params:
 
         # Display authenticated user
         user_info = sp.current_user()
-        #st.success(f"Authenticated as {user_info['display_name']}!")
+        st.success(f"Authenticated as {user_info['display_name']}!")
         
         # Save token in session state for reuse
         st.session_state["token_info"] = token_info
