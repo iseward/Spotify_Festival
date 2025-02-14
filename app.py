@@ -49,28 +49,29 @@ query_params = st.query_params
 
 
 
-# If user has already authenticated, get token
+# Authenticate user
 if "code" in query_params:
     code = query_params["code"]
-    token_info = auth_manager.get_access_token(code)
+    token_info = auth_manager.get_access_token(code, as_dict=False)  # REMOVE `as_dict=True`
     
     if token_info:
-        access_token = token_info["access_token"]
+        access_token = token_info
         sp = spotipy.Spotify(auth=access_token)
 
         # Display authenticated user
         user_info = sp.current_user()
         st.success(f"Authenticated as {user_info['display_name']}!")
-        
+
         # Save token in session state for reuse
         st.session_state["token_info"] = token_info
     else:
         st.error("Authentication failed. Please try again.")
 
-## If user is not authenticated, show login button
-#elif "token_info" not in st.session_state:
-#    st.markdown(f"[Click here to log in with Spotify]({auth_url})")
-
+# If user has already logged in before, use cached token
+elif "token_info" in st.session_state:
+    token_info = auth_manager.get_cached_token()
+    if token_info:
+        sp = spotipy.Spotify(auth=token_info["access_token"])
 
 
 
