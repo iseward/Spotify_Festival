@@ -173,3 +173,5 @@ cython_debug/
 config.ini
 
 .streamlit
+
+.spotify_cache
