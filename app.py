@@ -47,6 +47,8 @@ auth_url = auth_manager.get_authorize_url()
 query_params = st.query_params
 
 
+
+
 # If user has already authenticated, get token
 if "code" in query_params:
     code = query_params["code"]
@@ -58,23 +60,23 @@ if "code" in query_params:
 
         # Display authenticated user
         user_info = sp.current_user()
-        st.success(f"Authenticated as {user_info['display_name']}!")
+        #st.success(f"Authenticated as {user_info['display_name']}!")
         
         # Save token in session state for reuse
         st.session_state["token_info"] = token_info
     else:
         st.error("Authentication failed. Please try again.")
 
-# If user is not authenticated, show login button
-elif "token_info" not in st.session_state:
-    st.markdown(f"[Click here to log in with Spotify]({auth_url})")
+## If user is not authenticated, show login button
+#elif "token_info" not in st.session_state:
+#    st.markdown(f"[Click here to log in with Spotify]({auth_url})")
 
 
 
 
 # ---- STEP 1: SCRAPE ARTISTS FROM INSOMNIAC ----
 def get_event_lineup(event_url):
-    #st.write('Before requesting URL')
+    st.write('Getting artists from ' + event_url)
     response = requests.get(event_url)
     #st.write('after requesting url')
     soup = BeautifulSoup(response.text, 'html.parser')
@@ -82,7 +84,7 @@ def get_event_lineup(event_url):
     
     # Find artist names (Modify this selector based on Insomniac's HTML structure)
     artists = [artist.text.strip() for artist in soup.select('ul.lineup__list li')]
-    st.write('returning artists')
+    #st.write('Getting artists from ' + event_url)
     return artists
 
 
@@ -90,6 +92,7 @@ def get_event_lineup(event_url):
 
 # ---- STEP 3: CHECK LIKED SONGS ----
 def get_liked_songs():
+    st.write('Getting liked songs from Spotify')
     liked_songs = {}
     results = sp.current_user_saved_tracks(limit=50)
     #st.write('Spotify results returned.')
@@ -133,10 +136,21 @@ st.title("FestiBesti: Spotify Liked Songs Comparison")
 event_url = st.text_input("Enter Insomniac Event URL", "https://socal.beyondwonderland.com/lineup/")
 
 
+# Check if user is authenticated
+is_authenticated = "token_info" in st.session_state
 
-if st.button("Get Lineup & Liked Songs"):
-    check_authentication()
+# Show login button if user is not authenticated
+if not is_authenticated:
+    st.markdown(f"[Click here to log in with Spotify]({auth_url})")
+
+# Disable the button if the user is not authenticated
+button_disabled = not is_authenticated
+button_label = "Get Lineup & Liked Songs" if is_authenticated else "Log in to Spotify to see results"
+
+
+# Create the button (disabled if not authenticated)
+if st.button(button_label, disabled=button_disabled):
+    #st.write('after auth check')
     df = compare_artists(event_url)
-    #st.write('returned df')
     df = df.sort_values(by="Liked Songs", ascending=False)
     st.dataframe(df)  # Displays as an interactive table
