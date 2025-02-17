@@ -81,10 +81,10 @@ def get_event_lineup(event_url):
     response = requests.get(event_url)
     #st.write('after requesting url')
     soup = BeautifulSoup(response.text, 'html.parser')
-    #st.write('after soup')
     
     # Find artist names (Modify this selector based on Insomniac's HTML structure)
     artists = [artist.text.strip() for artist in soup.select('ul.lineup__list li')]
+    artists = list(set(artists))
     #st.write('Getting artists from ' + event_url)
     return artists
 
@@ -95,17 +95,20 @@ def get_event_lineup(event_url):
 def get_liked_songs():
     st.write('Getting liked songs from Spotify')
     liked_songs = {}
-    results = sp.current_user_saved_tracks(limit=50)
-    #st.write('Spotify results returned.')
-    while results:
+    total = sp.current_user_saved_tracks(limit=1)['total']  # Get total liked songs
+    #st.write(f"Total liked songs: {total}")
+    
+    limit = 50
+    for offset in range(0, total, limit):  # Iterate through all pages
+        #st.write(f"Getting liked songs in batch: {offset}")
+        results = sp.current_user_saved_tracks(limit=limit, offset=offset)
+        
         for item in results['items']:
             artist_name = item['track']['artists'][0]['name']
-            #st.write('checking artist:', artist_name)
             liked_songs[artist_name] = liked_songs.get(artist_name, 0) + 1
-        
-        results = sp.next(results) if results['next'] else None
     
     return liked_songs
+
 
 # ---- STEP 4: COMPARE EVENT ARTISTS WITH LIKED SONGS ----
 def compare_artists(event_url):
