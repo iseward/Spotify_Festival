@@ -6,25 +6,14 @@ from spotipy.exceptions import SpotifyException
 import time, os
 import pandas as pd
 import streamlit as st
-
 import configparser
-
-import streamlit as st
 
 try:
     SPOTIPY_CLIENT_ID = st.secrets["my_secrets"]["client_id"]
     SPOTIPY_CLIENT_SECRET = st.secrets["my_secrets"]["client_secret"]
     SPOTIPY_REDIRECT_URI = st.secrets["my_secrets"]["redirect_uri"]
-    #st.write("API key found:", SPOTIPY_CLIENT_ID)
 except KeyError:
-    st.write("API key not found. Reading config file.")
-    # Load config file
-    #config = configparser.ConfigParser()
-    #config.read("config.ini")
-    # ---- STEP 2: SPOTIFY AUTH ----
-    #SPOTIPY_CLIENT_ID = config.get("spotify", "client_id")
-    #SPOTIPY_CLIENT_SECRET = config.get("spotify", "client_secret")
-    #SPOTIPY_REDIRECT_URI = config.get("spotify", "redirect_uri")
+    st.write("API key not found.")
 
 
 event_url = 'https://socal.beyondwonderland.com/lineup/'
@@ -52,10 +41,11 @@ query_params = st.query_params
 # Authenticate user
 if "code" in query_params:
     code = query_params["code"]
-    token_info = auth_manager.get_access_token(code, as_dict=False)  # REMOVE `as_dict=True`
+    token_info = auth_manager.get_access_token(code)
+    st.write(token_info)
     
     if token_info:
-        access_token = token_info
+        access_token = token_info["access_token"]
         sp = spotipy.Spotify(auth=access_token)
 
         # Display authenticated user
@@ -70,6 +60,7 @@ if "code" in query_params:
 # If user has already logged in before, use cached token
 elif "token_info" in st.session_state:
     token_info = auth_manager.get_cached_token()
+    print(f"token_info: ", token_info)
     if token_info:
         sp = spotipy.Spotify(auth=token_info["access_token"])
 
@@ -123,15 +114,6 @@ def compare_artists(event_url):
     
     return df  # Return DataFrame instead of printing
 
-def check_authentication():
-    try:
-        user_info = sp.current_user()  # This will fetch the current user's information
-        st.write("Authenticated as:", user_info["display_name"])
-        return True
-    except SpotifyException as e:
-        st.error(f"Authentication failed: {e}")
-        return False
-
 
      
 # Streamlit App
@@ -157,4 +139,6 @@ if st.button(button_label, disabled=button_disabled):
     #st.write('after auth check')
     df = compare_artists(event_url)
     df = df.sort_values(by="Liked Songs", ascending=False)
+    # Reset index
+    df = df.reset_index(drop=True)
     st.dataframe(df)  # Displays as an interactive table
