@@ -25,7 +25,7 @@ auth_manager = SpotifyOAuth(
     redirect_uri=SPOTIPY_REDIRECT_URI,
     scope="user-library-read user-read-private",
     show_dialog=True
-    #,    cache_path=".spotify_cache"
+    #,    cache_path=".cache"
 )
 
 # Get authentication URL
@@ -40,12 +40,12 @@ query_params = st.query_params
 # Authenticate user
 if "code" in query_params:
     code = query_params["code"]
-    token_info = auth_manager.get_access_token(as_dict=False)  # Ensure full token dict
+    print(f"Code: ", code)
+    token_info = auth_manager.get_access_token(code, check_cache=False)  # Ensure full token dict
 
     if token_info:
-        print(token_info)
-        access_token = token_info#["access_token"]  # Extract actual access token
-        sp = spotipy.Spotify(auth_manager=auth_manager)  # Use auth_manager instead of just token
+        access_token = token_info["access_token"]  # Extract actual access token
+        sp = spotipy.Spotify(access_token)  # Use auth_manager instead of just token
 
         # Display authenticated user
         user_info = sp.current_user()
@@ -58,11 +58,11 @@ if "code" in query_params:
 
 
 # If user has already logged in before, use cached token
-elif auth_manager.get_cached_token():
-    token_info = auth_manager.get_cached_token()
-    print(f"token_info: ", token_info)
-    if token_info:
-        sp = spotipy.Spotify(auth=token_info["access_token"])
+#elif "token_info" in st.session_state:
+#    token_info = auth_manager.get_cached_token()
+#    print(f"token_info: ", token_info)
+#    if token_info:
+#        sp = spotipy.Spotify(auth=token_info["access_token"])
 
 
 
@@ -127,11 +127,11 @@ is_authenticated = "token_info" in st.session_state
 
 # Show login button if user is not authenticated
 if not is_authenticated:
-    st.markdown(f"[1. Click here to log in with Spotify]({auth_url})")
+    st.markdown(f"[Click here to log in with Spotify]({auth_url})")
 
 # Disable the button if the user is not authenticated
 button_disabled = not is_authenticated
-button_label = "2. Get Lineup & Liked Songs" if is_authenticated else "Log in to Spotify to see results"
+button_label = "Get Lineup & Liked Songs" if is_authenticated else "Log in to Spotify to see results"
 
 
 # Create the button (disabled if not authenticated)
