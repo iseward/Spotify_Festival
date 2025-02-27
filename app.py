@@ -19,14 +19,13 @@ except KeyError:
 event_url = 'https://socal.beyondwonderland.com/lineup/'
 
 
-# Set up Spotify authentication
 auth_manager = SpotifyOAuth(
     client_id=SPOTIPY_CLIENT_ID,
     client_secret=SPOTIPY_CLIENT_SECRET,
     redirect_uri=SPOTIPY_REDIRECT_URI,
-    scope="user-library-read",
-    show_dialog=True,
-    cache_path=".spotify_cache"  # Caching helps with re-authentication
+    scope="user-library-read user-read-private",
+    show_dialog=True
+    #,    cache_path=".spotify_cache"
 )
 
 # Get authentication URL
@@ -41,24 +40,25 @@ query_params = st.query_params
 # Authenticate user
 if "code" in query_params:
     code = query_params["code"]
-    token_info = auth_manager.get_access_token(code)
-    st.write(token_info)
-    
+    token_info = auth_manager.get_access_token(as_dict=False)  # Ensure full token dict
+
     if token_info:
-        access_token = token_info["access_token"]
-        sp = spotipy.Spotify(auth=access_token)
+        print(token_info)
+        access_token = token_info#["access_token"]  # Extract actual access token
+        sp = spotipy.Spotify(auth_manager=auth_manager)  # Use auth_manager instead of just token
 
         # Display authenticated user
         user_info = sp.current_user()
-        st.success(f"Authenticated as {user_info['display_name']}!")
+        st.success(f"Authenticated as {user_info['display_name']}!")  # This should now show the correct user
 
         # Save token in session state for reuse
         st.session_state["token_info"] = token_info
     else:
         st.error("Authentication failed. Please try again.")
 
+
 # If user has already logged in before, use cached token
-elif "token_info" in st.session_state:
+elif auth_manager.get_cached_token():
     token_info = auth_manager.get_cached_token()
     print(f"token_info: ", token_info)
     if token_info:
@@ -127,11 +127,11 @@ is_authenticated = "token_info" in st.session_state
 
 # Show login button if user is not authenticated
 if not is_authenticated:
-    st.markdown(f"[Click here to log in with Spotify]({auth_url})")
+    st.markdown(f"[1. Click here to log in with Spotify]({auth_url})")
 
 # Disable the button if the user is not authenticated
 button_disabled = not is_authenticated
-button_label = "Get Lineup & Liked Songs" if is_authenticated else "Log in to Spotify to see results"
+button_label = "2. Get Lineup & Liked Songs" if is_authenticated else "Log in to Spotify to see results"
 
 
 # Create the button (disabled if not authenticated)
