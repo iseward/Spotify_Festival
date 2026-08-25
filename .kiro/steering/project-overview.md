@@ -2,7 +2,7 @@
 
 ## What This App Does
 
-FestiBesti is a single-page Streamlit app that cross-references a festival artist lineup against the user's Spotify liked songs. The user pastes an Insomniac event URL, logs in with Spotify OAuth, and gets back a table of lineup artists sorted by how many of their songs the user has liked.
+FestiBesti is a single-page Streamlit app that cross-references a festival artist lineup against the user's Spotify liked songs. The user selects an Insomniac festival from a dropdown, logs in with Spotify OAuth, and gets back a table of lineup artists sorted by how many of their songs the user has liked. All artists on a track are credited, not just the primary artist.
 
 ---
 
@@ -10,7 +10,7 @@ FestiBesti is a single-page Streamlit app that cross-references a festival artis
 
 ```
 Spotify_Festival/
-├── .cache                  # Spotipy OAuth token cache (auto-generated at runtime)
+├── .cache                  # Spotipy OAuth token cache (auto-generated at runtime, gitignored)
 ├── .git/                   # Git history
 ├── .gitignore
 ├── .kiro/
@@ -18,10 +18,10 @@ Spotify_Festival/
 │       └── project-overview.md   # This file
 ├── .streamlit/
 │   └── secrets.toml        # Spotify credentials for Streamlit (gitignored)
+├── .venv/                  # Local Python virtual environment (gitignored)
 ├── app.py                  # The entire application — all logic lives here
-├── config.ini              # Legacy credential file (gitignored, no longer read by the app)
 ├── README.md               # One-line project description
-└── requirements.txt        # Python runtime dependencies
+└── requirements.txt        # Pinned Python runtime dependencies
 ```
 
 ---
@@ -30,16 +30,18 @@ Spotify_Festival/
 
 The app is a single flat file with no modules or subfolders. Execution flows top to bottom:
 
-| Section | Lines (approx.) | What it does |
-|---|---|---|
-| Imports & credentials | 1–17 | Imports libs; loads Spotify creds from `st.secrets["my_secrets"]` |
-| OAuth setup | 20–30 | Creates `SpotifyOAuth` manager with `scope="user-library-read"` |
-| Auth URL + query params | 32–36 | Generates Spotify login URL; reads callback `?code=` from URL params |
-| Page title | 39 | `st.title(...)` |
-| `get_event_lineup(event_url)` | 42–51 | Scrapes Insomniac event page with requests + BeautifulSoup (`ul.lineup__list li`) |
-| `get_liked_songs(sp)` | 54–68 | Fetches all liked songs paginated (50/page), builds `{artist: count}` dict |
-| `compare_artists(event_url, sp)` | 71–82 | Calls both functions, merges into a pandas DataFrame |
-| Main UI flow | 84–113 | Text input for URL, login link or authenticated table depending on OAuth state |
+| Section | What it does |
+|---|---|
+| Imports & credentials | Imports libs; loads Spotify creds from `st.secrets["my_secrets"]` |
+| `FESTIVALS` dict | Maps festival display names to their Insomniac lineup URLs |
+| OAuth setup | Creates `SpotifyOAuth` manager with `scope="user-library-read"` |
+| Auth URL + query params | Generates Spotify login URL; reads callback `?code=` from URL params |
+| `get_event_lineup(event_url)` | Scrapes Insomniac event page with requests + BeautifulSoup (`ul.lineup__list li`) |
+| `get_liked_songs(sp, token_info)` | Fetches all liked songs paginated (50/page), builds `{artist: count}` dict; credits all artists per track |
+| `compare_artists(event_url, sp, token_info)` | Calls both functions, merges into a pandas DataFrame |
+| Festival selector UI | `st.selectbox` of known festivals; "Other" option reveals a free-text URL input |
+| Auth URL generation | Selected festival URL is URL-encoded into the OAuth `state` param so Spotify echoes it back on redirect |
+| Main auth flow | On redirect, festival URL is decoded from `?state=`; login link or results table shown depending on OAuth state |
 
 ### Libraries Used
 
@@ -47,91 +49,74 @@ The app is a single flat file with no modules or subfolders. Execution flows top
 - `spotipy` + `SpotifyOAuth` — Spotify Web API + OAuth 2.0
 - `requests` + `beautifulsoup4` — lineup scraping
 - `pandas` — DataFrame for results
-- `configparser` — **imported but never used** (dead code, legacy of `config.ini` era)
+- `time`, `os` — standard library, available for future use
 
----
+### Known Festivals (FESTIVALS dict)
 
-## Known Issues & Improvement Tips
+| Display Name | URL |
+|---|---|
+| Beyond Wonderland SoCal | https://socal.beyondwonderland.com/lineup/ |
+| Beyond Wonderland Chicago | https://chicago.beyondwonderland.com/lineup/ |
+| EDC Las Vegas | https://lasvegas.electricdaisycarnival.com/lineup/ |
+| EDC Orlando | https://orlando.electricdaisycarnival.com/lineup/ |
+| Nocturnal Wonderland | https://www.nocturnalwonderland.com/lineup/ |
+| Escape Halloween | https://www.escapehalloween.com/lineup/ |
+| Other (enter URL) | None — reveals text input |
 
-### 1. Pin dependency versions in requirements.txt
-
-Currently all four deps are unpinned (e.g. `streamlit`, `spotipy`). This means `pip install` can pull breaking versions. Pin them:
-
-```
-beautifulsoup4==4.12.3
-spotipy==2.24.0
-streamlit==1.37.0
-pandas==2.2.2
-```
-
-Run `pip freeze > requirements.txt` (inside `.venv`) to capture exact versions.
-
-Also, `requests` is used in the code but missing from `requirements.txt`. It works today as a transitive dep but should be explicit.
-
-### 2. Use a .venv for isolation
-
-There's no `.venv` in the repo. Add one:
-
-```powershell
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-Add `.venv/` to `.gitignore` (it's not there yet).
-
-### 3. Fix .gitignore — .cache is not excluded
-
-`.gitignore` excludes `.spotify_cache` but the actual Spotipy token cache is named `.cache`. That file could end up committed. Add `.cache` to `.gitignore`.
-
-### 4. Remove dead code
-
-- `import configparser` is never used — remove it.
-- The `config.ini` file is no longer read by the app. Delete it or leave it as a local-only reference, but the import should go.
-- `event_url` is assigned at the top of `app.py` but the `st.text_input` default overrides it — the first assignment is redundant.
-
-### 5. Token caching / re-auth friction
-
-`cache_path` is commented out in `SpotifyOAuth` and `check_cache=False` is passed to `get_access_token`. Combined with `show_dialog=True`, the user is forced to re-authenticate on every page load. Enable caching to improve UX:
-
-```python
-sp_oauth = SpotifyOAuth(
-    client_id=CLIENT_ID,
-    client_secret=CLIENT_SECRET,
-    redirect_uri=REDIRECT_URI,
-    scope="user-library-read",
-    cache_path=".cache",
-    show_dialog=False,
-)
-```
-
-### 6. Add error handling
-
-The scraper and Spotify calls have no try/except. If the event URL is wrong or the network is down, the app crashes. Wrap the main logic in try/except and surface a friendly `st.error(...)` message.
-
-### 7. Multi-artist tracks only credit artist[0]
-
-`get_liked_songs` only counts `artists[0]` per track. A song with two artists only increments the first. This could undercount headliners who appear in collabs.
-
-### 8. Credential management
-
-- `config.ini` has plaintext Spotify credentials. It's gitignored, but the app has fully migrated to `.streamlit/secrets.toml` — `config.ini` can be deleted.
-- Spotify no longer allows `localhost` as a redirect URI. Use `http://127.0.0.1:8501/` for local dev and `https://FestiBestiApp.streamlit.app` for the deployed app. Both must be registered in the Spotify Developer Dashboard and the correct one set in `secrets.toml`.
-
-### 9. Hardcoded Insomniac CSS selector
-
-`get_event_lineup` uses `ul.lineup__list li` which is specific to Insomniac's HTML. Any other festival site will return 0 artists. Consider documenting this limitation or making the selector configurable.
+To add a festival, add an entry to the `FESTIVALS` dict at the top of `app.py`.
 
 ---
 
 ## Running the App
 
 ```powershell
-# Activate venv (once set up)
+# Activate venv
 .venv\Scripts\activate
 
 # Run locally
 streamlit run app.py
 ```
 
-Spotify will redirect to `http://localhost:8888/callback` after login — make sure this URI is registered in your Spotify developer dashboard.
+Spotify redirects to `http://127.0.0.1:8501/` after login. Make sure this URI (and `https://FestiBestiApp.streamlit.app` for deployment) are both registered in the Spotify Developer Dashboard.
+
+---
+
+## Credentials & Auth
+
+- Spotify credentials live in `.streamlit/secrets.toml` under `[my_secrets]` — this file is gitignored.
+- `localhost` is **not** allowed as a Spotify redirect URI. Use `http://127.0.0.1:8501/` for local dev.
+- Token caching is currently disabled (`check_cache=False`, `show_dialog=True`). This means the user must re-authenticate on every page load. See "Known Limitations" below.
+
+---
+
+## Known Limitations & Remaining Improvements
+
+### 1. Festival selection resets after OAuth redirect (resolved)
+
+The selected festival URL is encoded into the Spotify OAuth `state` parameter, which Spotify echoes back unchanged in the redirect URL (`?code=...&state=<encoded_url>`). The app decodes it on redirect — no session state or tab dependency.
+
+### 2. Token caching / re-auth friction
+
+`show_dialog=True` and `check_cache=False` force a full Spotify login on every page load. To fix, enable caching in `SpotifyOAuth`:
+
+```python
+auth_manager = SpotifyOAuth(
+    ...
+    cache_path=".cache",
+    show_dialog=False,
+)
+```
+
+And remove `check_cache=False` from `get_access_token`. This would also resolve the festival selection reset issue above.
+
+### 3. No error handling
+
+The scraper and Spotify API calls have no try/except. A bad URL, network failure, or expired token will crash the app with a raw Python traceback. Wrap key calls in try/except and surface `st.error(...)` messages.
+
+### 4. Hardcoded Insomniac CSS selector
+
+`get_event_lineup` uses `ul.lineup__list li` — specific to Insomniac's site structure. Non-Insomniac URLs entered via "Other" will return 0 artists silently.
+
+### 5. Only local dev redirect URI in secrets.toml
+
+When deploying to Streamlit Cloud, `redirect_uri` in `secrets.toml` must be changed to `https://FestiBestiApp.streamlit.app`. Consider managing this with separate local vs. deployed secrets rather than manually swapping.
