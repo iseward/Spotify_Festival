@@ -6,7 +6,6 @@ from spotipy.exceptions import SpotifyException
 import time, os
 import pandas as pd
 import streamlit as st
-import configparser
 
 try:
     SPOTIPY_CLIENT_ID = st.secrets["my_secrets"]["client_id"]
