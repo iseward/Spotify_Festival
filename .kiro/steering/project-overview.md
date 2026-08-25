@@ -116,7 +116,7 @@ The scraper and Spotify calls have no try/except. If the event URL is wrong or t
 ### 8. Credential management
 
 - `config.ini` has plaintext Spotify credentials. It's gitignored, but the app has fully migrated to `.streamlit/secrets.toml` — `config.ini` can be deleted.
-- The redirect URI (`http://localhost:8888/callback`) only works locally. If you ever deploy to Streamlit Cloud, the URI must be updated in both the Spotify dashboard and the secrets file.
+- Spotify no longer allows `localhost` as a redirect URI. Use `http://127.0.0.1:8501/` for local dev and `https://FestiBestiApp.streamlit.app` for the deployed app. Both must be registered in the Spotify Developer Dashboard and the correct one set in `secrets.toml`.
 
 ### 9. Hardcoded Insomniac CSS selector
 

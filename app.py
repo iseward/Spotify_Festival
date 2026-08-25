@@ -15,16 +15,12 @@ except KeyError:
     st.write("API key not found.")
 
 
-event_url = 'https://socal.beyondwonderland.com/lineup/'
-
-
 auth_manager = SpotifyOAuth(
     client_id=SPOTIPY_CLIENT_ID,
     client_secret=SPOTIPY_CLIENT_SECRET,
     redirect_uri=SPOTIPY_REDIRECT_URI,
-    scope="user-library-read",          #user-read-private
+    scope="user-library-read",
     show_dialog=True
-    #,    cache_path=".cache"
 )
 
 # Get authentication URL
@@ -42,24 +38,21 @@ st.title("FestiBesti: Spotify Liked Songs Comparison")
 def get_event_lineup(event_url):
     st.write('Getting artists from ' + event_url)
     response = requests.get(event_url)
-    #st.write('after requesting url')
     soup = BeautifulSoup(response.text, 'html.parser')
     
-    # Find artist names (Modify this selector based on Insomniac's HTML structure)
+    # Find artist names (selector is specific to Insomniac's HTML structure)
     artists = [artist.text.strip() for artist in soup.select('ul.lineup__list li')]
     artists = list(set(artists))
-    #st.write('Getting artists from ' + event_url)
     return artists
 
 
-# ---- STEP 3: CHECK LIKED SONGS ----
-def get_liked_songs(sp):
+# ---- STEP 2: CHECK LIKED SONGS ----
+def get_liked_songs(sp, token_info):
     st.write('Getting liked songs from Spotify')
-    print(f"Getting songs with token: ", token_info)
 
     # Fetch liked songs
     liked_songs = {}
-    total = sp.current_user_saved_tracks(limit=1)['total']  # Get total liked songs
+    total = sp.current_user_saved_tracks(limit=1)['total']
     st.write(f"Total liked songs: {total}")
     
     limit = 50
@@ -73,54 +66,42 @@ def get_liked_songs(sp):
     return liked_songs
 
 
-# ---- STEP 4: COMPARE EVENT ARTISTS WITH LIKED SONGS ----
-def compare_artists(event_url, sp):
+# ---- STEP 3: COMPARE EVENT ARTISTS WITH LIKED SONGS ----
+def compare_artists(event_url, sp, token_info):
     lineup = get_event_lineup(event_url)
-    #st.write('Getting liked songs')
-    liked_songs = get_liked_songs(sp)
+    liked_songs = get_liked_songs(sp, token_info)
     
     data = [{"Artist": artist, "Liked Songs": liked_songs.get(artist, 0)} for artist in lineup]
     
     # Convert to DataFrame
     df = pd.DataFrame(data)
     
-    return df  # Return DataFrame instead of printing
+    return df
 
 
-event_url = st.text_input(f"Enter Insomniac Event URL", event_url)
+event_url = st.text_input(f"Enter Insomniac Event URL", 'https://socal.beyondwonderland.com/lineup/')
 
 is_authenticated = "code" in query_params
 
 # Authenticate user
 if is_authenticated:
     code = query_params["code"]
-    #print(f"Code: ", code)
-    #st.write(f"Code: ", code)
-    #token_info = auth_manager.get_access_token(code)  # This does not work due to caching issues
-    token_info = auth_manager.get_access_token(code, check_cache=False)  # 
-    #token_info = auth_manager.get_access_token(code, as_dict=True, check_cache=False)  # Ensure full token dict
-    print(f"token_info: ", token_info)
+    token_info = auth_manager.get_access_token(code, check_cache=False)
 
     if token_info:
-        access_token = token_info["access_token"]  # Extract actual access token
+        access_token = token_info["access_token"]
         sp = spotipy.Spotify(access_token)
 
         # Display authenticated user
         user_info = sp.current_user()
-        st.success(f"Authenticated as {user_info['display_name']}!")  # This should now show the correct user
-        #st.write(f"Token expired? ", auth_manager.is_token_expired(token_info))
+        st.success(f"Authenticated as {user_info['display_name']}!")
         
-        df = compare_artists(event_url, sp)
+        df = compare_artists(event_url, sp, token_info)
         df = df.sort_values(by="Liked Songs", ascending=False)
-        # Reset index
         df = df.reset_index(drop=True)
-        st.dataframe(df)  # Displays as an interactive table
+        st.dataframe(df)
     
     else:
         st.error("Authentication failed. Please try again.")
 else:
     st.markdown(f"[Click here to log in with Spotify]({auth_url})")
-
-
-
-
