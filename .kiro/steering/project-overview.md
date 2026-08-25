@@ -57,10 +57,12 @@ The app is a single flat file with no modules or subfolders. Execution flows top
 |---|---|
 | Beyond Wonderland SoCal | https://socal.beyondwonderland.com/lineup/ |
 | Beyond Wonderland Chicago | https://chicago.beyondwonderland.com/lineup/ |
+| Dreamstate SoCal | https://socal.dreamstateusa.com/lineup/ |
+| Dreamstate SF | https://sf.dreamstateusa.com/lineup/ |
 | EDC Las Vegas | https://lasvegas.electricdaisycarnival.com/lineup/ |
 | EDC Orlando | https://orlando.electricdaisycarnival.com/lineup/ |
-| Nocturnal Wonderland | https://www.nocturnalwonderland.com/lineup/ |
 | Escape Halloween | https://www.escapehalloween.com/lineup/ |
+| Nocturnal Wonderland | https://www.nocturnalwonderland.com/lineup/ |
 | Other (enter URL) | None — reveals text input |
 
 To add a festival, add an entry to the `FESTIVALS` dict at the top of `app.py`.
