@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from spotipy.exceptions import SpotifyException
-from urllib.parse import urlencode, quote, unquote
+from urllib.parse import quote, unquote
 import time, os
 import pandas as pd
 import streamlit as st
@@ -13,7 +13,8 @@ try:
     SPOTIPY_CLIENT_SECRET = st.secrets["my_secrets"]["client_secret"]
     SPOTIPY_REDIRECT_URI = st.secrets["my_secrets"]["redirect_uri"]
 except KeyError:
-    st.write("API key not found.")
+    st.error("Spotify API credentials not found. Check your secrets.toml configuration.")
+    st.stop()
 
 
 # Known Insomniac festival lineup URLs
@@ -29,26 +30,46 @@ FESTIVALS = {
     "Other (enter URL)": None,
 }
 
+class _NoCache(spotipy.cache_handler.CacheHandler):
+    """No-op cache handler — prevents Spotipy from reading or writing any token cache file."""
+    def get_cached_token(self):
+        return None
+    def save_token_to_cache(self, token_info):
+        pass
 
 auth_manager = SpotifyOAuth(
     client_id=SPOTIPY_CLIENT_ID,
     client_secret=SPOTIPY_CLIENT_SECRET,
     redirect_uri=SPOTIPY_REDIRECT_URI,
     scope="user-library-read",
-    show_dialog=True
+    show_dialog=False,
+    cache_handler=_NoCache(),   # Tokens live in session_state only — no disk writes
 )
 
-# Get query parameters
 query_params = st.query_params
 
-
-# Streamlit App
 st.title("FestiBesti: Spotify Liked Songs Comparison")
 
 
-# ---- STEP 1: SCRAPE ARTISTS FROM INSOMNIAC ----
+# ---- HELPERS ----
+
+def get_valid_token():
+    """Return a valid access token from session state, refreshing if expired. Returns None if not authenticated."""
+    token_info = st.session_state.get("token_info")
+    if not token_info:
+        return None
+    if auth_manager.is_token_expired(token_info):
+        try:
+            token_info = auth_manager.refresh_access_token(token_info["refresh_token"])
+            st.session_state["token_info"] = token_info
+        except Exception:
+            # Refresh failed — clear session and force re-auth
+            st.session_state.pop("token_info", None)
+            return None
+    return token_info
+
+
 def get_event_lineup(event_url):
-    st.write('Getting artists from ' + event_url)
     try:
         response = requests.get(event_url, timeout=10)
         response.raise_for_status()
@@ -64,7 +85,7 @@ def get_event_lineup(event_url):
 
     soup = BeautifulSoup(response.text, 'html.parser')
 
-    # Find artist names (selector is specific to Insomniac's HTML structure)
+    # Selector is specific to Insomniac's HTML structure
     artists = [artist.text.strip() for artist in soup.select('ul.lineup__list li')]
     artists = list(set(artists))
 
@@ -74,10 +95,7 @@ def get_event_lineup(event_url):
     return artists
 
 
-# ---- STEP 2: CHECK LIKED SONGS ----
-def get_liked_songs(sp, token_info):
-    st.write('Getting liked songs from Spotify')
-
+def get_liked_songs(sp):
     try:
         total = sp.current_user_saved_tracks(limit=1)['total']
     except SpotifyException as e:
@@ -85,12 +103,12 @@ def get_liked_songs(sp, token_info):
         return {}
 
     if total == 0:
-        st.warning("This Spotify account has no liked songs.")
+        st.warning("This Spotify account has no liked songs. Make sure you're logged into the right account.")
         return {}
 
     st.write(f"Total liked songs: {total}")
 
-    # Fetch liked songs — credit all artists on each track, not just the primary
+    # Credit all artists on each track, not just the primary
     liked_songs = {}
     limit = 50
     for offset in range(0, total, limit):
@@ -108,37 +126,72 @@ def get_liked_songs(sp, token_info):
     return liked_songs
 
 
-# ---- STEP 3: COMPARE EVENT ARTISTS WITH LIKED SONGS ----
-def compare_artists(event_url, sp, token_info):
+def compare_artists(event_url, sp):
     lineup = get_event_lineup(event_url)
     if not lineup:
         return pd.DataFrame(columns=["Artist", "Liked Songs"])
 
-    liked_songs = get_liked_songs(sp, token_info)
-
+    liked_songs = get_liked_songs(sp)
     data = [{"Artist": artist, "Liked Songs": liked_songs.get(artist, 0)} for artist in lineup]
-
     return pd.DataFrame(data)
 
 
-is_authenticated = "code" in query_params
+def do_logout():
+    st.session_state.pop("token_info", None)
+    st.session_state.pop("event_url", None)
+    st.session_state["show_dialog"] = True
+    st.query_params.clear()
 
-if is_authenticated:
-    # ---- AUTHENTICATED: restore event_url from the state param Spotify echoed back ----
-    event_url = unquote(query_params.get("state", ""))
 
+# ---- AUTH FLOW ----
+
+# Step 1: OAuth callback — exchange code for token and store in session state
+if "code" in query_params and "token_info" not in st.session_state:
     code = query_params["code"]
-    token_info = auth_manager.get_access_token(code, check_cache=False)
+    event_url_from_state = unquote(query_params.get("state", ""))
+    try:
+        token_info = auth_manager.get_access_token(code)
+        st.session_state["token_info"] = token_info
+        if event_url_from_state:
+            st.session_state["event_url"] = event_url_from_state
+    except Exception as e:
+        st.error(f"Authentication failed: {e}")
+    # Clear query params so ?code= doesn't persist on reruns
+    st.query_params.clear()
+    st.rerun()
 
-    if token_info:
-        access_token = token_info["access_token"]
-        sp = spotipy.Spotify(access_token)
+# Step 2: Check for a valid token in session state
+token_info = get_valid_token()
 
+# ---- AUTHENTICATED VIEW ----
+if token_info:
+    sp = spotipy.Spotify(auth=token_info["access_token"])
+
+    try:
         user_info = sp.current_user()
-        st.success(f"Authenticated as {user_info['display_name']}!")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.success(f"Authenticated as {user_info['display_name']}")
+        with col2:
+            if st.button("Log out"):
+                do_logout()
+                st.rerun()
+    except SpotifyException:
+        st.error("Could not retrieve Spotify user info. Please log in again.")
+        do_logout()
+        st.rerun()
 
+    # Festival selector — shown every time so user can switch without re-auth
+    selected_festival = st.selectbox("Select a festival", list(FESTIVALS.keys()))
+    if FESTIVALS[selected_festival] is None:
+        event_url = st.text_input("Enter Insomniac Event URL", placeholder="https://example.com/lineup/")
+    else:
+        event_url = FESTIVALS[selected_festival]
+
+    if st.button("Compare"):
         if event_url:
-            df = compare_artists(event_url, sp, token_info)
+            with st.spinner("Fetching lineup and liked songs..."):
+                df = compare_artists(event_url, sp)
             if not df.empty:
                 df = df.sort_values(by="Liked Songs", ascending=False)
                 df = df.reset_index(drop=True)
@@ -146,23 +199,22 @@ if is_authenticated:
             else:
                 st.info("No results to display. Check the festival URL or your liked songs.")
         else:
-            st.error("No festival URL found. Please go back and select a festival.")
+            st.warning("Please select or enter a festival URL.")
 
-    else:
-        st.error("Authentication failed. Please try again.")
-
+# ---- UNAUTHENTICATED VIEW ----
 else:
-    # ---- NOT AUTHENTICATED: show festival selector and login link ----
     selected_festival = st.selectbox("Select a festival", list(FESTIVALS.keys()))
-
     if FESTIVALS[selected_festival] is None:
         event_url = st.text_input("Enter Insomniac Event URL", placeholder="https://example.com/lineup/")
     else:
         event_url = FESTIVALS[selected_festival]
 
-    # Encode the selected URL into the Spotify auth state param — Spotify echoes it back on redirect
     if event_url:
+        show_dialog = st.session_state.pop("show_dialog", False)
         auth_url = auth_manager.get_authorize_url(state=quote(event_url, safe=""))
+        # If coming from a logout, force Spotify to show the account picker
+        if show_dialog:
+            auth_url += "&show_dialog=true"
         st.markdown(f"[Click here to log in with Spotify]({auth_url})")
     else:
         st.info("Select or enter a festival URL to continue.")
