@@ -175,3 +175,6 @@ config.ini
 .streamlit
 
 .spotify_cache
+.cache
+
+.venv/
