@@ -181,10 +181,17 @@ if token_info:
         do_logout()
         st.rerun()
 
-    # Festival selector — shown every time so user can switch without re-auth
-    selected_festival = st.selectbox("Select a festival", list(FESTIVALS.keys()))
+    # Festival selector — pre-select based on session state if coming from OAuth redirect
+    festival_names = list(FESTIVALS.keys())
+    stored_url = st.session_state.get("event_url", "")
+    # Find which festival name matches the stored URL, fall back to first entry
+    url_to_name = {v: k for k, v in FESTIVALS.items() if v is not None}
+    default_festival = url_to_name.get(stored_url, festival_names[0])
+    default_index = festival_names.index(default_festival)
+
+    selected_festival = st.selectbox("Select a festival", festival_names, index=default_index)
     if FESTIVALS[selected_festival] is None:
-        event_url = st.text_input("Enter Insomniac Event URL", placeholder="https://example.com/lineup/")
+        event_url = st.text_input("Enter Insomniac Event URL", placeholder="https://example.com/lineup/", value=stored_url)
     else:
         event_url = FESTIVALS[selected_festival]
 
